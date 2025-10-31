@@ -45,7 +45,7 @@ export function VoiceDeployInterface() {
     timestamp: string
   }>>([])
 
-  const quickCommands = ["Deploy api-gateway", "Deploy frontend-app", "Deploy all services"]
+  const quickCommands = ["Deploy api-gateway", "Deploy frontend-app", "Deploy auth-service"]
   const [transcript, setTranscript] = useState("")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<any>(null)
