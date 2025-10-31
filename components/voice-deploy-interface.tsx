@@ -5,6 +5,7 @@ import { Send } from "lucide-react"
 import VoiceRecorder from "./voice-recorder"
 import DeploymentCard from "./deployment-card"
 import CommandLog from "./command-log"
+import ConfirmationModal from "./confirmation-modal"
 
 interface Deployment {
   id: string
@@ -22,8 +23,16 @@ export function VoiceDeployInterface() {
     timestamp: string
   }>>([])
   const [transcript, setTranscript] = useState("")
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [pendingCommand, setPendingCommand] = useState("")
 
   const handleVoiceCommand = (command: string) => {
+    setPendingCommand(command)
+    setIsModalOpen(true)
+  }
+
+  const handleConfirm = () => {
+    const command = pendingCommand
     setTranscript(command)
     setCommands((prev) =>
       [
@@ -131,6 +140,13 @@ export function VoiceDeployInterface() {
           </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        onConfirm={handleConfirm}
+        command={pendingCommand}
+      />
     </div>
   )
 }
