@@ -1,12 +1,15 @@
-import { CheckCircle, AlertCircle, Clock, Zap } from "lucide-react"
+import { CheckCircle, AlertCircle, Clock, Zap, Package, Beaker } from "lucide-react"
+
+type DeploymentStatus = "queued" | "building" | "testing" | "deploying" | "success" | "failed"
 
 interface DeploymentCardProps {
   deployment: {
     id: string
     app: string
-    status: "deploying" | "success" | "failed" | "pending"
+    status: DeploymentStatus
     timestamp: string
     duration?: string
+    environment: "dev" | "staging" | "production"
   }
 }
 
@@ -33,13 +36,33 @@ export default function DeploymentCard({ deployment }: DeploymentCardProps) {
       border: "border-destructive/30",
       label: "Failed",
     },
-    pending: {
+    queued: {
       icon: Clock,
       color: "text-muted-foreground",
       bg: "bg-muted/10",
       border: "border-muted/30",
-      label: "Pending",
+      label: "Queued",
     },
+    building: {
+      icon: Package,
+      color: "text-yellow-500",
+      bg: "bg-yellow-500/10",
+      border: "border-yellow-500/30",
+      label: "Building",
+    },
+    testing: {
+      icon: Beaker,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+      border: "border-blue-500/30",
+      label: "Testing",
+    },
+  }
+
+  const envConfig = {
+    dev: "bg-green-500/20 text-green-500",
+    staging: "bg-orange-500/20 text-orange-500",
+    production: "bg-red-500/20 text-red-500",
   }
 
   const config = statusConfig[deployment.status]
@@ -50,10 +73,19 @@ export default function DeploymentCard({ deployment }: DeploymentCardProps) {
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3 flex-1">
           <Icon
-            className={`w-5 h-5 ${config.color} mt-0.5 shrink-0 ${deployment.status === "deploying" ? "animate-spin" : ""}`}
+            className={`w-5 h-5 ${config.color} mt-0.5 shrink-0 ${
+              ["building", "testing", "deploying"].includes(deployment.status) ? "animate-spin" : ""
+            }`}
           />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground truncate">{deployment.app}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-foreground truncate">{deployment.app}</p>
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-medium ${envConfig[deployment.environment]}`}
+              >
+                {deployment.environment}
+              </span>
+            </div>
             <p className="text-xs text-muted-foreground">{deployment.timestamp}</p>
           </div>
         </div>
