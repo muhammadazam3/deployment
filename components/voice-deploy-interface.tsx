@@ -10,6 +10,8 @@ import CommandLog from "./command-log"
 import ConfirmationModal from "./confirmation-modal"
 import BranchCard from "./branch-card"
 import PullRequestCard from "./pull-request-card"
+import CreatePullRequestForm from "./create-pull-request-form"
+import { Button } from "@/components/ui/button"
 
 type DeploymentStatus = "queued" | "building" | "testing" | "deploying" | "success" | "failed"
 
@@ -49,6 +51,7 @@ export function VoiceDeployInterface() {
   const [transcript, setTranscript] = useState("")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<any>(null)
+  const [isCreatePrModalOpen, setIsCreatePrModalOpen] = useState(false)
   const [environment, setEnvironment] = useState("dev")
   const [branches, setBranches] = useState<Branch[]>([
     { name: "main", lastCommit: "f2a1b3d" },
@@ -83,6 +86,18 @@ export function VoiceDeployInterface() {
       const prId = parseInt(mergePrMatch[1], 10)
       setPendingAction({ type: "merge-pr", prId, command })
       setIsModalOpen(true)
+      return
+    }
+
+    // Check for create PR command
+    const createPrMatch = lowerCaseCommand.match(
+      /create pull request from (\w+) to (\w+) titled (.+)/,
+    )
+    if (createPrMatch) {
+      const sourceBranch = createPrMatch[1]
+      const targetBranch = createPrMatch[2]
+      const title = createPrMatch[3]
+      handleCreatePullRequest({ title, sourceBranch, targetBranch })
       return
     }
 
@@ -178,19 +193,32 @@ export function VoiceDeployInterface() {
     setIsModalOpen(true)
   }
 
+  const handleCreatePullRequest = (pr: {
+    title: string
+    sourceBranch: string
+    targetBranch: string
+  }) => {
+    const newPr: PullRequest = {
+      id: Math.floor(Math.random() * 1000),
+      ...pr,
+      status: "open",
+    }
+    setPullRequests((prev) => [newPr, ...prev])
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-background to-card">
       <header className="border-b border-border/40 backdrop-blur-sm bg-background/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Deployments</h1>
-              <p className="text-muted-foreground mt-1">Deploy applications with voice/commands</p>
+              <h1 className="text-3xl font-bold text-foreground">Voice Deploy</h1>
+              <p className="text-muted-foreground mt-1">Deploy applications with voice commands</p>
             </div>
-            {/* <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20">
               <div className="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
               <span className="text-sm text-accent font-medium">System Ready</span>
-            </div> */}
+            </div>
           </div>
         </div>
       </header>
@@ -236,7 +264,7 @@ export function VoiceDeployInterface() {
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quick Commands</p>
                 <div className="space-y-2">
-                  {quickCommands.map((cmd) => (
+                  {["Deploy api-gateway", "Deploy frontend-app", "Deploy all services"].map((cmd) => (
                     <button
                       key={cmd}
                       onClick={() => handleVoiceCommand(cmd)}
@@ -278,7 +306,12 @@ export function VoiceDeployInterface() {
 
             {/* Pull Requests */}
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Pull Requests</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-foreground">Pull Requests</h2>
+                <Button size="sm" onClick={() => setIsCreatePrModalOpen(true)}>
+                  Create PR
+                </Button>
+              </div>
               <div className="space-y-3">
                 {pullRequests.map((pr) => (
                   <PullRequestCard key={pr.id} pr={pr} onMerge={() => handleMergePR(pr.id)} />
@@ -294,6 +327,12 @@ export function VoiceDeployInterface() {
         onOpenChange={setIsModalOpen}
         onConfirm={handleConfirm}
         action={pendingAction}
+      />
+      <CreatePullRequestForm
+        branches={branches}
+        isOpen={isCreatePrModalOpen}
+        onOpenChange={setIsCreatePrModalOpen}
+        onCreate={handleCreatePullRequest}
       />
     </div>
   )
