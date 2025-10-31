@@ -27,6 +27,8 @@ export function VoiceDeployInterface() {
     command: string
     timestamp: string
   }>>([])
+
+  const quickCommands = ["Deploy api-gateway", "Deploy frontend-app", "Deploy all services"]
   const [transcript, setTranscript] = useState("")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [pendingCommand, setPendingCommand] = useState("")
@@ -95,13 +97,13 @@ export function VoiceDeployInterface() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Voice Deploy</h1>
-              <p className="text-muted-foreground mt-1">Deploy applications with voice commands</p>
+              <h1 className="text-3xl font-bold text-foreground">Deployments</h1>
+              <p className="text-muted-foreground mt-1">Deploy applications with voice/commands</p>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20">
+            {/* <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20">
               <div className="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
               <span className="text-sm text-accent font-medium">System Ready</span>
-            </div>
+            </div> */}
           </div>
         </div>
       </header>
@@ -147,7 +149,7 @@ export function VoiceDeployInterface() {
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quick Commands</p>
                 <div className="space-y-2">
-                  {["Deploy api-gateway", "Deploy frontend-app", "Deploy all services"].map((cmd) => (
+                  {quickCommands.map((cmd) => (
                     <button
                       key={cmd}
                       onClick={() => handleVoiceCommand(cmd)}
