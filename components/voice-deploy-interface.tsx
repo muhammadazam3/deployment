@@ -2,16 +2,22 @@
 
 import { useState } from "react"
 import { Send } from "lucide-react"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
 import VoiceRecorder from "./voice-recorder"
 import DeploymentCard from "./deployment-card"
 import CommandLog from "./command-log"
+import ConfirmationModal from "./confirmation-modal"
+
+type DeploymentStatus = "queued" | "building" | "testing" | "deploying" | "success" | "failed"
 
 interface Deployment {
   id: string
   app: string
-  status: "deploying" | "success" | "failed" | "pending"
+  status: DeploymentStatus
   timestamp: string
   duration?: string
+  environment: "dev" | "staging" | "production"
 }
 
 export function VoiceDeployInterface() {
@@ -22,8 +28,18 @@ export function VoiceDeployInterface() {
     timestamp: string
   }>>([])
   const [transcript, setTranscript] = useState("")
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [pendingCommand, setPendingCommand] = useState("")
+  const [environment, setEnvironment] = useState("dev")
 
   const handleVoiceCommand = (command: string) => {
+    if (isModalOpen) return
+    setPendingCommand(command)
+    setIsModalOpen(true)
+  }
+
+  const handleConfirm = () => {
+    const command = pendingCommand
     setTranscript(command)
     setCommands((prev) =>
       [
@@ -39,23 +55,32 @@ export function VoiceDeployInterface() {
     const newDeployment: Deployment = {
       id: Date.now().toString(),
       app: extractAppName(command),
-      status: "pending",
+      status: "queued",
       timestamp: "Now",
+      environment: environment as "dev" | "staging" | "production",
     }
     setDeployments((prev) => [newDeployment, ...prev])
 
-    // Simulate deployment progress
-    setTimeout(() => {
-      setDeployments((prev) =>
-        prev.map((d) => (d.id === newDeployment.id ? { ...d, status: "deploying", duration: "5s" } : d)),
-      )
-    }, 500)
+    const deploymentSteps: { status: DeploymentStatus; duration: number }[] = [
+      { status: "building", duration: environment === "dev" ? 2000 : 5000 },
+      { status: "testing", duration: environment === "dev" ? 3000 : 8000 },
+      { status: "deploying", duration: environment === "dev" ? 4000 : 10000 },
+      { status: "success", duration: 0 },
+    ]
 
-    setTimeout(() => {
-      setDeployments((prev) =>
-        prev.map((d) => (d.id === newDeployment.id ? { ...d, status: "success", duration: "1m 15s" } : d)),
-      )
-    }, 3000)
+    let totalDuration = 0
+    deploymentSteps.forEach((step) => {
+      totalDuration += step.duration
+      setTimeout(() => {
+        setDeployments((prev) =>
+          prev.map((d) =>
+            d.id === newDeployment.id
+              ? { ...d, status: step.status, duration: `${totalDuration / 1000}s` }
+              : d,
+          ),
+        )
+      }, totalDuration)
+    })
   }
 
   const extractAppName = (command: string): string => {
@@ -87,6 +112,29 @@ export function VoiceDeployInterface() {
           <div className="lg:col-span-1 space-y-6">
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground">Voice Commands</h2>
+
+              {/* Environment Selector */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Environment</p>
+                <RadioGroup
+                  value={environment}
+                  onValueChange={setEnvironment}
+                  className="flex items-center space-x-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="dev" id="dev" />
+                    <Label htmlFor="dev">Dev</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="staging" id="staging" />
+                    <Label htmlFor="staging">Staging</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="production" id="production" />
+                    <Label htmlFor="production">Production</Label>
+                  </div>
+                </RadioGroup>
+              </div>
 
               <VoiceRecorder
                 isListening={isListening}
@@ -131,6 +179,13 @@ export function VoiceDeployInterface() {
           </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        onConfirm={handleConfirm}
+        command={pendingCommand}
+      />
     </div>
   )
 }
