@@ -8,6 +8,10 @@ import VoiceRecorder from "./voice-recorder"
 import DeploymentCard from "./deployment-card"
 import CommandLog from "./command-log"
 import ConfirmationModal from "./confirmation-modal"
+import BranchCard from "./branch-card"
+import PullRequestCard from "./pull-request-card"
+import CreatePullRequestForm from "./create-pull-request-form"
+import { Button } from "@/components/ui/button"
 
 type DeploymentStatus = "queued" | "building" | "testing" | "deploying" | "success" | "failed"
 
@@ -20,6 +24,21 @@ interface Deployment {
   environment: "dev" | "staging" | "production"
 }
 
+interface Branch {
+  name: string
+  lastCommit: string
+}
+
+type PullRequestStatus = "open" | "merged" | "closed"
+
+interface PullRequest {
+  id: number
+  title: string
+  sourceBranch: string
+  targetBranch: string
+  status: PullRequestStatus
+}
+
 export function VoiceDeployInterface() {
   const [isListening, setIsListening] = useState(false)
   const [deployments, setDeployments] = useState<Deployment[]>([])
@@ -27,66 +46,164 @@ export function VoiceDeployInterface() {
     command: string
     timestamp: string
   }>>([])
+
+  const quickCommands = ["Deploy api-gateway", "Deploy frontend-app", "Deploy auth-service"]
   const [transcript, setTranscript] = useState("")
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [pendingCommand, setPendingCommand] = useState("")
+  const [pendingAction, setPendingAction] = useState<any>(null)
+  const [isCreatePrModalOpen, setIsCreatePrModalOpen] = useState(false)
   const [environment, setEnvironment] = useState("dev")
+  const [branches, setBranches] = useState<Branch[]>([
+    { name: "main", lastCommit: "f2a1b3d" },
+    { name: "development", lastCommit: "a4c6e8f" },
+    { name: "staging", lastCommit: "b5d7f9a" },
+  ])
+  const [pullRequests, setPullRequests] = useState<PullRequest[]>([
+    {
+      id: 15,
+      title: "feat: add user authentication",
+      sourceBranch: "feat/user-auth",
+      targetBranch: "development",
+      status: "open",
+    },
+    {
+      id: 16,
+      title: "fix: resolve issue with API gateway",
+      sourceBranch: "fix/api-gateway",
+      targetBranch: "development",
+      status: "open",
+    },
+  ])
 
   const handleVoiceCommand = (command: string) => {
     if (isModalOpen) return
-    setPendingCommand(command)
+
+    const lowerCaseCommand = command.toLowerCase()
+
+    // Check for merge PR command
+    const mergePrMatch = lowerCaseCommand.match(/merge pull request (\d+)/)
+    if (mergePrMatch) {
+      const prId = parseInt(mergePrMatch[1], 10)
+      setPendingAction({ type: "merge-pr", prId, command })
+      setIsModalOpen(true)
+      return
+    }
+
+    // Check for create PR command
+    const createPrMatch = lowerCaseCommand.match(
+      /create pull request from (\w+) to (\w+) titled (.+)/,
+    )
+    if (createPrMatch) {
+      const sourceBranch = createPrMatch[1]
+      const targetBranch = createPrMatch[2]
+      const title = createPrMatch[3]
+      handleCreatePullRequest({ title, sourceBranch, targetBranch })
+      return
+    }
+
+    // Check for merge branch command
+    const mergeBranchMatch = lowerCaseCommand.match(/merge (\w+) into (\w+)/)
+    if (mergeBranchMatch) {
+      const sourceBranch = mergeBranchMatch[1]
+      const targetBranch = mergeBranchMatch[2]
+      setPendingAction({ type: "merge-branch", sourceBranch, targetBranch, command })
+      setIsModalOpen(true)
+      return
+    }
+
+    // Default to deploy command
+    setPendingAction({ type: "deploy", command })
     setIsModalOpen(true)
   }
 
   const handleConfirm = () => {
-    const command = pendingCommand
-    setTranscript(command)
-    setCommands((prev) =>
-      [
-        {
-          command,
-          timestamp: new Date().toLocaleTimeString(),
-        } as any,
-        ...prev,
-      ].slice(0, 10),
-    )
+    if (!pendingAction) return
 
-    // Simulate deployment
-    const newDeployment: Deployment = {
-      id: Date.now().toString(),
-      app: extractAppName(command),
-      status: "queued",
-      timestamp: "Now",
-      environment: environment as "dev" | "staging" | "production",
-    }
-    setDeployments((prev) => [newDeployment, ...prev])
+    if (pendingAction.type === "deploy") {
+      const { command } = pendingAction
+      setTranscript(command)
+      setCommands((prev) =>
+        [
+          {
+            command,
+            timestamp: new Date().toLocaleTimeString(),
+          } as any,
+          ...prev,
+        ].slice(0, 10),
+      )
 
-    const deploymentSteps: { status: DeploymentStatus; duration: number }[] = [
-      { status: "building", duration: environment === "dev" ? 2000 : 5000 },
-      { status: "testing", duration: environment === "dev" ? 3000 : 8000 },
-      { status: "deploying", duration: environment === "dev" ? 4000 : 10000 },
-      { status: "success", duration: 0 },
-    ]
+      // Simulate deployment
+      const newDeployment: Deployment = {
+        id: Date.now().toString(),
+        app: extractAppName(command),
+        status: "queued",
+        timestamp: "Now",
+        environment: environment as "dev" | "staging" | "production",
+      }
+      setDeployments((prev) => [newDeployment, ...prev])
 
-    let totalDuration = 0
-    deploymentSteps.forEach((step) => {
-      totalDuration += step.duration
-      setTimeout(() => {
-        setDeployments((prev) =>
-          prev.map((d) =>
-            d.id === newDeployment.id
-              ? { ...d, status: step.status, duration: `${totalDuration / 1000}s` }
-              : d,
+      const deploymentSteps: { status: DeploymentStatus; duration: number }[] = [
+        { status: "building", duration: environment === "dev" ? 2000 : 5000 },
+        { status: "testing", duration: environment === "dev" ? 3000 : 8000 },
+        { status: "deploying", duration: environment === "dev" ? 4000 : 10000 },
+        { status: "success", duration: 0 },
+      ]
+
+      let totalDuration = 0
+      deploymentSteps.forEach((step) => {
+        totalDuration += step.duration
+        setTimeout(() => {
+          setDeployments((prev) =>
+            prev.map((d) =>
+              d.id === newDeployment.id
+                ? { ...d, status: step.status, duration: `${totalDuration / 1000}s` }
+                : d,
+            ),
+          )
+        }, totalDuration)
+      })
+    } else if (pendingAction.type === "merge-pr") {
+      const { prId } = pendingAction
+      setPullRequests((prev) =>
+        prev.map((pr) => (pr.id === prId ? { ...pr, status: "merged" } : pr)),
+      )
+    } else if (pendingAction.type === "merge-branch") {
+      const { sourceBranch, targetBranch } = pendingAction
+      const sourceBranchData = branches.find((b) => b.name === sourceBranch)
+      if (sourceBranchData) {
+        setBranches((prev) =>
+          prev.map((b) =>
+            b.name === targetBranch ? { ...b, lastCommit: sourceBranchData.lastCommit } : b,
           ),
         )
-      }, totalDuration)
-    })
+      }
+    }
+
+    setPendingAction(null)
   }
 
   const extractAppName = (command: string): string => {
     const apps = ["api-gateway", "frontend-app", "auth-service", "database", "cache-layer"]
     const foundApp = apps.find((app) => command.toLowerCase().includes(app))
     return foundApp || "app-" + Math.random().toString(36).substr(2, 5)
+  }
+
+  const handleMergePR = (prId: number) => {
+    setPendingAction({ type: "merge-pr", prId })
+    setIsModalOpen(true)
+  }
+
+  const handleCreatePullRequest = (pr: {
+    title: string
+    sourceBranch: string
+    targetBranch: string
+  }) => {
+    const newPr: PullRequest = {
+      id: Math.floor(Math.random() * 1000),
+      ...pr,
+      status: "open",
+    }
+    setPullRequests((prev) => [newPr, ...prev])
   }
 
   return (
@@ -176,6 +293,31 @@ export function VoiceDeployInterface() {
 
             {/* Command Log */}
             <CommandLog commands={commands} />
+
+            {/* Branches */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-foreground">Branches</h2>
+              <div className="space-y-3">
+                {branches.map((branch) => (
+                  <BranchCard key={branch.name} branch={branch} />
+                ))}
+              </div>
+            </div>
+
+            {/* Pull Requests */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-foreground">Pull Requests</h2>
+                <Button size="sm" onClick={() => setIsCreatePrModalOpen(true)}>
+                  Create PR
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {pullRequests.map((pr) => (
+                  <PullRequestCard key={pr.id} pr={pr} onMerge={() => handleMergePR(pr.id)} />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -184,7 +326,13 @@ export function VoiceDeployInterface() {
         isOpen={isModalOpen}
         onOpenChange={setIsModalOpen}
         onConfirm={handleConfirm}
-        command={pendingCommand}
+        action={pendingAction}
+      />
+      <CreatePullRequestForm
+        branches={branches}
+        isOpen={isCreatePrModalOpen}
+        onOpenChange={setIsCreatePrModalOpen}
+        onCreate={handleCreatePullRequest}
       />
     </div>
   )
